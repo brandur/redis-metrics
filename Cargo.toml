@@ -1,0 +1,16 @@
+[package]
+name = "redis-metrics"
+version = "0.1.0"
+authors = ["Brandur <brandur@mutelight.org>"]
+build = "build.rs"
+
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+libc = "0.2.0"
+nom = "^1.2.4"
+time = "0.1"
+
+[build-dependencies]
+gcc = "*"
