@@ -37,6 +37,17 @@ pub struct Metric {
     /// being sent sampled every 1/10th of the time). Only applies to counters
     /// and samples, and is an optional value even in both those cases.
     sample_rate: Option<f64>,
+
+    /// Sign is a sign assigned to a metric value. It may have a value for
+    /// gauges only (and may not). It is `None` for all other metric types.
+    sign: Option<MetricSign>,
+}
+
+/// Signs on a metric's value. Only applicable to the gauge metric type.
+#[derive(Debug, PartialEq)]
+pub enum MetricSign {
+    Minus,
+    Plus,
 }
 
 /// All possible types of a metric.
@@ -87,6 +98,7 @@ named!(pub statsd_metric<Metric>,
     chain!(
         name: map_res!(is_not!(":"), str::from_utf8) ~
         tag!(":") ~
+        sign: opt!(map_res!(alt!(tag!("-") | tag!("+")), str::from_utf8)) ~
         value: map_res!(is_not!("|"), str::from_utf8) ~
         tag!("|") ~
         type_or_unit: map_res!(nom::alphanumeric, str::from_utf8) ~
@@ -98,6 +110,7 @@ named!(pub statsd_metric<Metric>,
             metric_type: parse_metric_type(type_or_unit),
             unit: parse_unit(type_or_unit),
             sample_rate: sample_rate,
+            sign: parse_sign(sign),
         }}
     )
 );
@@ -109,6 +122,14 @@ fn parse_metric_type(s: &str) -> MetricType {
         "s" => MetricType::Set,
         _ => MetricType::Sample,
     }
+}
+
+fn parse_sign(s: Option<&str>) -> Option<MetricSign> {
+    s.map(|s2| match s2 {
+        "-" => MetricSign::Minus,
+        "+" => MetricSign::Plus,
+        _ => panic!("parser problem"),
+    })
 }
 
 fn parse_unit(s: &str) -> Option<String> {
@@ -133,6 +154,7 @@ mod tests {
             metric_type: MetricType::Counter,
             unit: None,
             sample_rate: None,
+            sign: None,
         }));
     }
 
@@ -144,6 +166,7 @@ mod tests {
             metric_type: MetricType::Counter,
             unit: None,
             sample_rate: Some(0.1),
+            sign: None,
         }));
     }
 
@@ -155,6 +178,7 @@ mod tests {
             metric_type: MetricType::Sample,
             unit: Some(String::from("ms")),
             sample_rate: None,
+            sign: None,
         }));
     }
 
@@ -166,6 +190,7 @@ mod tests {
             metric_type: MetricType::Sample,
             unit: Some(String::from("ms")),
             sample_rate: Some(0.1),
+            sign: None,
         }));
     }
 
@@ -177,6 +202,28 @@ mod tests {
             metric_type: MetricType::Gauge,
             unit: None,
             sample_rate: None,
+            sign: None,
+        }));
+    }
+
+    #[test]
+    fn it_parses_signed_gauge() {
+        assert_eq!(statsd_metric(b"gaugor:-10|g"), IResult::Done(&b""[..], Metric{
+            name: String::from("gaugor"),
+            value: String::from("10"),
+            metric_type: MetricType::Gauge,
+            unit: None,
+            sample_rate: None,
+            sign: Some(MetricSign::Minus),
+        }));
+
+        assert_eq!(statsd_metric(b"gaugor:+4|g"), IResult::Done(&b""[..], Metric{
+            name: String::from("gaugor"),
+            value: String::from("4"),
+            metric_type: MetricType::Gauge,
+            unit: None,
+            sample_rate: None,
+            sign: Some(MetricSign::Plus),
         }));
     }
 
@@ -188,6 +235,7 @@ mod tests {
             metric_type: MetricType::Set,
             unit: None,
             sample_rate: None,
+            sign: None,
         }));
     }
 
@@ -200,6 +248,7 @@ mod tests {
                 metric_type: MetricType::Counter,
                 unit: None,
                 sample_rate: None,
+                sign: None,
             }
         ]));
     }
@@ -214,6 +263,7 @@ mod tests {
                 metric_type: MetricType::Counter,
                 unit: None,
                 sample_rate: None,
+                sign: None,
             },
             Metric{
                 name: String::from("glork"),
@@ -221,6 +271,7 @@ mod tests {
                 metric_type: MetricType::Sample,
                 unit: Some(String::from("ms")),
                 sample_rate: None,
+                sign: None,
             },
             Metric{
                 name: String::from("gaugor"),
@@ -228,6 +279,7 @@ mod tests {
                 metric_type: MetricType::Gauge,
                 unit: None,
                 sample_rate: None,
+                sign: None,
             },
             Metric{
                 name: String::from("uniques"),
@@ -235,6 +287,7 @@ mod tests {
                 metric_type: MetricType::Set,
                 unit: None,
                 sample_rate: None,
+                sign: None,
             },
         ]))
     }
