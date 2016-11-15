@@ -1,6 +1,11 @@
 //! Implements a parser using nom for StatsD metrics including counters,
 //! gauges, samples, and sets. See [this document][metric-types] for more
-//! details.
+//! details. Some examples of input that this package will parse are:
+//!
+//!     gorets:1|c
+//!     glork:320|ms|@0.1
+//!     gaugor:333|g
+//!     uniques:765|s
 //!
 //! See the tests for example, but generally speaking, the `statsd` macro is
 //! the only thing that needs to be used from this package.
